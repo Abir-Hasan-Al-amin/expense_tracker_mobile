@@ -15,7 +15,7 @@ ios/
 .env.local
 .env.*.local
 
-# Build artifacts
+# Build artifact
 *.jks
 *.p8
 *.p12
