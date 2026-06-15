@@ -73,10 +73,80 @@ npm run ios
 
 ## Build (EAS)
 
+### 1. Install EAS CLI and log in
+
 ```bash
-eas build --platform android
-eas build --platform ios
+npm install -g eas-cli
+eas login
 ```
+
+### 2. Configure environment variable for builds
+
+EAS builds run on Expo's cloud servers — your local `.env` file is not available there. You have two options:
+
+#### Option A — Hardcode in `eas.json` (simpler, fine for non-secret URLs)
+
+Add an `env` block to each build profile in `eas.json`:
+
+```json
+"preview": {
+  "env": {
+    "EXPO_PUBLIC_API_URL": "https://your-backend-url/api"
+  }
+},
+"production": {
+  "env": {
+    "EXPO_PUBLIC_API_URL": "https://your-backend-url/api"
+  }
+}
+```
+
+#### Option B — EAS Secrets (recommended, keeps URL out of the repo)
+
+```bash
+eas secret:create --scope project --name EXPO_PUBLIC_API_URL --value https://your-backend-url/api
+```
+
+The secret is encrypted and injected automatically into every build — no changes to `eas.json` needed.
+
+To list or delete secrets:
+
+```bash
+eas secret:list
+eas secret:delete --name EXPO_PUBLIC_API_URL
+```
+
+### 3. Run the build
+
+```bash
+# Android APK (for direct install / testing)
+eas build --platform android --profile preview
+
+# Android App Bundle (for Play Store)
+eas build --platform android --profile production
+
+# iOS (requires Apple Developer account)
+eas build --platform ios --profile production
+
+# Both platforms at once
+eas build --platform all --profile production
+```
+
+### 4. Download and install
+
+After the build completes, EAS prints a download link. For Android APK (`preview` profile), you can also install directly:
+
+```bash
+eas build:run --platform android
+```
+
+### Build profiles summary
+
+| Profile | Android output | Use case |
+| --- | --- | --- |
+| `development` | APK (dev client) | Local development with Expo dev client |
+| `preview` | APK | Internal testing, direct install |
+| `production` | AAB | Google Play Store submission |
 
 ## API Endpoints Expected
 
