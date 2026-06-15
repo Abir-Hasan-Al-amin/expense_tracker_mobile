@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
 import * as expenseApi from '../api/expenses';
 import * as categoryApi from '../api/categories';
+import { useAuth } from './AuthContext';
 
 const AppContext = createContext(null);
 
@@ -12,8 +13,24 @@ const initialState = {
   error: null,
 };
 
+function computeStats(stats, removed, added) {
+  if (!stats) return null;
+  let { totalIncome, totalExpense } = stats;
+  if (removed) {
+    if (removed.type === 'income') totalIncome -= removed.amount;
+    else totalExpense -= removed.amount;
+  }
+  if (added) {
+    if (added.type === 'income') totalIncome += added.amount;
+    else totalExpense += added.amount;
+  }
+  return { ...stats, totalIncome, totalExpense, balance: totalIncome - totalExpense };
+}
+
 function reducer(state, action) {
   switch (action.type) {
+    case 'RESET':
+      return initialState;
     case 'SET_LOADING':
       return { ...state, loading: action.payload, error: null };
     case 'SET_ERROR':
@@ -25,19 +42,27 @@ function reducer(state, action) {
     case 'SET_STATS':
       return { ...state, stats: action.payload };
     case 'ADD_EXPENSE':
-      return { ...state, expenses: [action.payload, ...state.expenses] };
-    case 'UPDATE_EXPENSE':
       return {
         ...state,
-        expenses: state.expenses.map((e) =>
-          e._id === action.payload._id ? action.payload : e
-        ),
+        expenses: [action.payload, ...state.expenses],
+        stats: computeStats(state.stats, null, action.payload),
       };
-    case 'DELETE_EXPENSE':
+    case 'UPDATE_EXPENSE': {
+      const old = state.expenses.find((e) => e._id === action.payload._id);
+      return {
+        ...state,
+        expenses: state.expenses.map((e) => e._id === action.payload._id ? action.payload : e),
+        stats: computeStats(state.stats, old ?? null, action.payload),
+      };
+    }
+    case 'DELETE_EXPENSE': {
+      const deleted = state.expenses.find((e) => e._id === action.payload);
       return {
         ...state,
         expenses: state.expenses.filter((e) => e._id !== action.payload),
+        stats: computeStats(state.stats, deleted ?? null, null),
       };
+    }
     case 'ADD_CATEGORY':
       return { ...state, categories: [...state.categories, action.payload] };
     case 'UPDATE_CATEGORY':
@@ -57,16 +82,16 @@ function reducer(state, action) {
   }
 }
 
-const STATS_TTL = 60_000; // 60 seconds
+const STATS_TTL = 60_000;
 
 export function AppProvider({ children }) {
+  const { user } = useAuth();
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Refs avoid re-renders while tracking fetch state
   const categoriesLoadedRef = useRef(false);
-  const expensesDirtyRef = useRef(true); // true = needs a fetch
-  const lastFetchParamsRef = useRef(null); // JSON key of last fetchExpenses params
-  const statsCache = useRef({}); // { "month-year": { data, ts } }
+  const expensesDirtyRef = useRef(true);
+  const lastFetchParamsRef = useRef(null);
+  const statsCache = useRef({});
 
   const fetchCategories = useCallback(async () => {
     if (categoriesLoadedRef.current) return;
@@ -80,13 +105,22 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Load categories once at startup so all screens have them immediately
-  useEffect(() => { fetchCategories(); }, [fetchCategories]);
+  // Reset all state when user logs out or changes, then load categories for the new session
+  useEffect(() => {
+    if (!user) {
+      dispatch({ type: 'RESET' });
+      categoriesLoadedRef.current = false;
+      expensesDirtyRef.current = true;
+      lastFetchParamsRef.current = null;
+      statsCache.current = {};
+      return;
+    }
+    fetchCategories();
+  }, [user?.username, fetchCategories]);
 
   const fetchExpenses = useCallback(async (params, force = false) => {
     const key = JSON.stringify(params);
     const sameParams = lastFetchParamsRef.current === key;
-    // Skip if same params, not dirty, and not forced
     if (!force && sameParams && !expensesDirtyRef.current && lastFetchParamsRef.current !== null) return;
 
     expensesDirtyRef.current = false;
@@ -96,7 +130,7 @@ export function AppProvider({ children }) {
       const data = await expenseApi.getExpenses(params);
       dispatch({ type: 'SET_EXPENSES', payload: data?.expenses ?? [] });
     } catch (err) {
-      expensesDirtyRef.current = true; // allow retry next focus
+      expensesDirtyRef.current = true;
       dispatch({ type: 'SET_ERROR', payload: err.message });
     }
   }, []);
@@ -117,13 +151,11 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // Call after any mutation so next focus re-fetches
   const markDirty = useCallback(() => {
     expensesDirtyRef.current = true;
     statsCache.current = {};
   }, []);
 
-  // Call after bulk-deleting categories so next fetchCategories re-fetches from server
   const resetCategories = useCallback(() => {
     categoriesLoadedRef.current = false;
     dispatch({ type: 'SET_CATEGORIES', payload: [] });

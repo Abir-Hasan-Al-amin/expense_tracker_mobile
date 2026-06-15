@@ -13,8 +13,8 @@ import EmptyState from '../components/EmptyState';
 import * as budgetApi from '../api/budgets';
 import client from '../api/client';
 
-// Process recurring at most once per calendar day across all re-renders
-let recurringCalledDate = null;
+// Process recurring at most once per user per calendar day
+let recurringCalledKey = null;
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -31,20 +31,19 @@ export default function DashboardScreen({ navigation }) {
 
   const loadData = useCallback(() => {
     const now = new Date();
-    const today = now.toDateString();
-    // Trigger recurring once per day; if it runs, force a fresh expense fetch
-    if (recurringCalledDate !== today) {
-      recurringCalledDate = today;
+    const key = `${user?.username}:${now.toDateString()}`;
+    if (recurringCalledKey !== key) {
+      recurringCalledKey = key;
       client.post('/expenses/process-recurring')
         .then((res) => { if (res?.created?.length > 0) markDirty(); })
         .catch(() => {});
-      fetchExpenses({ limit: 10 }, true); // force: recurring may add entries
+      fetchExpenses({ limit: 10 }, true);
     } else {
       fetchExpenses({ limit: 10 });
     }
     fetchStats({ month: now.getMonth() + 1, year: now.getFullYear() });
     budgetApi.getBudgets({ month: now.getMonth() + 1, year: now.getFullYear() }).then(setBudgets).catch(() => {});
-  }, [fetchExpenses, fetchStats, markDirty]);
+  }, [fetchExpenses, fetchStats, markDirty, user?.username]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', loadData);

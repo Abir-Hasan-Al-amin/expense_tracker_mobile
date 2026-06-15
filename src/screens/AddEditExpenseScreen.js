@@ -12,8 +12,10 @@ const FREQUENCIES = ['daily', 'weekly', 'monthly'];
 export default function AddEditExpenseScreen({ navigation, route }) {
   const { expense } = route.params || {};
   const isEdit = !!expense;
-  const { categories, addExpense, editExpense, removeExpense } = useApp();
+  const { categories, fetchCategories, addExpense, editExpense, removeExpense } = useApp();
   const { colors, currencyInfo } = useSettings();
+
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
 
   const [type, setType] = useState(expense?.type || 'expense');
   const [title, setTitle] = useState(expense?.title || '');
