@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useSettings } from '../context/SettingsContext';
 import { spacing, radius, shadows } from '../theme';
 import DatePickerModal from '../components/DatePickerModal';
+import * as walletsApi from '../api/wallets';
 
 const TYPES = ['expense', 'income'];
 const FREQUENCIES = ['daily', 'weekly', 'monthly'];
@@ -25,9 +26,19 @@ export default function AddEditExpenseScreen({ navigation, route }) {
   const [note, setNote] = useState(expense?.note || '');
   const [isRecurring, setIsRecurring] = useState(expense?.isRecurring || false);
   const [frequency, setFrequency] = useState(expense?.recurringFrequency || 'monthly');
+  const [walletId, setWalletId] = useState(expense?.wallet?._id || expense?.wallet || '');
+  const [tags, setTags] = useState(expense?.tags?.join(', ') || '');
+  const [wallets, setWallets] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    walletsApi.getWallets()
+      .then((data) => setWallets(data.wallets || []))
+      .catch(() => {});
+  }, []);
 
   const handleDelete = useCallback(() => {
     Alert.alert('Delete Transaction', 'Are you sure?', [
@@ -60,7 +71,14 @@ export default function AddEditExpenseScreen({ navigation, route }) {
     if (!category) return Alert.alert('Validation', 'Please select a category.');
     setSaving(true);
     try {
-      const data = { title: title.trim(), amount: parsedAmount, type, category: category._id, date: date.toISOString(), note: note.trim(), isRecurring, recurringFrequency: isRecurring ? frequency : null };
+      const parsedTags = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      const data = {
+        title: title.trim(), amount: parsedAmount, type, category: category._id,
+        date: date.toISOString(), note: note.trim(), isRecurring,
+        recurringFrequency: isRecurring ? frequency : null,
+        wallet: walletId || undefined,
+        tags: parsedTags.length > 0 ? parsedTags : undefined,
+      };
       isEdit ? await editExpense(expense._id, data) : await addExpense(data);
       navigation.goBack();
     } catch (err) { Alert.alert('Error', err.message); }
@@ -119,6 +137,29 @@ export default function AddEditExpenseScreen({ navigation, route }) {
           <TextInput style={[styles.input, { flex: 1, height: 80, textAlignVertical: 'top', color: colors.text }]} value={note} onChangeText={setNote} placeholder="Add a note..." placeholderTextColor={colors.textMuted} multiline numberOfLines={3} />
         </View>
 
+        {/* Wallet */}
+        <Text style={[styles.label, { color: colors.textLight }]}>Wallet (optional)</Text>
+        <TouchableOpacity style={[styles.inputRow, { backgroundColor: colors.card }]} onPress={() => setShowWalletModal(true)}>
+          <Ionicons name="wallet-outline" size={18} color={colors.textMuted} />
+          <Text style={[styles.input, { flex: 1, color: walletId ? colors.text : colors.textMuted }]}>
+            {wallets.find((w) => w._id === walletId)?.name || 'Select wallet (auto-adjusts balance)'}
+          </Text>
+          {walletId ? (
+            <TouchableOpacity onPress={() => setWalletId('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+          ) : (
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          )}
+        </TouchableOpacity>
+
+        {/* Tags */}
+        <Text style={[styles.label, { color: colors.textLight }]}>Tags (optional)</Text>
+        <View style={[styles.inputRow, { backgroundColor: colors.card }]}>
+          <Ionicons name="pricetag-outline" size={18} color={colors.textMuted} />
+          <TextInput style={[styles.input, { color: colors.text }]} value={tags} onChangeText={setTags} placeholder="vacation, work (comma-separated)" placeholderTextColor={colors.textMuted} />
+        </View>
+
         {/* Recurring */}
         <View style={[styles.recurringRow, { backgroundColor: colors.card }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
@@ -150,6 +191,31 @@ export default function AddEditExpenseScreen({ navigation, route }) {
       </View>
 
       <DatePickerModal visible={showDatePicker} value={date} onConfirm={(d) => { setDate(d); setShowDatePicker(false); }} onCancel={() => setShowDatePicker(false)} />
+
+      {/* Wallet Modal */}
+      <Modal visible={showWalletModal} animationType="slide" transparent>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>Select Wallet</Text>
+              <TouchableOpacity onPress={() => setShowWalletModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {wallets.map((w) => (
+                <TouchableOpacity key={w._id} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.md }} onPress={() => { setWalletId(w._id); setShowWalletModal(false); }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{w.name}</Text>
+                    <Text style={{ fontSize: 12, color: colors.textMuted }}>Balance: {w.balance}</Text>
+                  </View>
+                  {walletId === w._id && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Category Modal */}
       <Modal visible={showCategoryModal} animationType="slide" transparent>

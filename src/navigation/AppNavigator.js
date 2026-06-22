@@ -16,6 +16,20 @@ import ProfileScreen from '../screens/ProfileScreen';
 import AddEditExpenseScreen from '../screens/AddEditExpenseScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import MoreScreen from '../screens/MoreScreen';
+
+// New feature screens
+import WalletsScreen from '../screens/WalletsScreen';
+import AddEditWalletScreen from '../screens/AddEditWalletScreen';
+import LoansScreen from '../screens/LoansScreen';
+import AddEditLoanScreen from '../screens/AddEditLoanScreen';
+import SavingsScreen from '../screens/SavingsScreen';
+import AddEditSavingsScreen from '../screens/AddEditSavingsScreen';
+import BillsScreen from '../screens/BillsScreen';
+import AddEditBillScreen from '../screens/AddEditBillScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import SplitsScreen from '../screens/SplitsScreen';
+import AddEditSplitScreen from '../screens/AddEditSplitScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -23,8 +37,9 @@ const Stack = createNativeStackNavigator();
 const TAB_ICONS = {
   Dashboard: { focused: 'home', outline: 'home-outline' },
   Transactions: { focused: 'list', outline: 'list-outline' },
+  Wallets: { focused: 'wallet', outline: 'wallet-outline' },
   Statistics: { focused: 'bar-chart', outline: 'bar-chart-outline' },
-  Categories: { focused: 'grid', outline: 'grid-outline' },
+  More: { focused: 'grid', outline: 'grid-outline' },
   Profile: { focused: 'person', outline: 'person-outline' },
 };
 
@@ -54,9 +69,9 @@ function TabNavigator() {
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Transactions" component={TransactionsScreen} />
+      <Tab.Screen name="Wallets" component={WalletsScreen} />
       <Tab.Screen name="Statistics" component={StatisticsScreen} />
-      <Tab.Screen name="Categories" component={CategoriesScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="More" component={MoreScreen} />
     </Tab.Navigator>
   );
 }
@@ -72,6 +87,17 @@ function AuthStack() {
 
 function AppStack() {
   const { colors } = useSettings();
+
+  const modalOptions = (title) => ({
+    title,
+    presentation: 'modal',
+    headerStyle: { backgroundColor: colors.primary },
+    headerTintColor: '#fff',
+    headerTitleStyle: { fontWeight: '700' },
+    statusBarColor: colors.primary,
+    statusBarStyle: 'light',
+  });
+
   return (
     <Stack.Navigator>
       <Stack.Screen
@@ -82,15 +108,83 @@ function AppStack() {
       <Stack.Screen
         name="AddEditExpense"
         component={AddEditExpenseScreen}
-        options={{
-          title: 'Add Transaction',
-          presentation: 'modal',
-          headerStyle: { backgroundColor: colors.primary },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: '700' },
-          statusBarColor: colors.primary,
-          statusBarStyle: 'light',
-        }}
+        options={modalOptions('Add Transaction')}
+      />
+
+      {/* Wallet screens */}
+      <Stack.Screen
+        name="AddEditWallet"
+        component={AddEditWalletScreen}
+        options={modalOptions('New Wallet')}
+      />
+
+      {/* Loan screens */}
+      <Stack.Screen
+        name="Loans"
+        component={LoansScreen}
+        options={{ headerShown: false, statusBarColor: colors.background, statusBarStyle: 'dark' }}
+      />
+      <Stack.Screen
+        name="AddEditLoan"
+        component={AddEditLoanScreen}
+        options={modalOptions('New Loan')}
+      />
+
+      {/* Savings screens */}
+      <Stack.Screen
+        name="Savings"
+        component={SavingsScreen}
+        options={{ headerShown: false, statusBarColor: colors.background, statusBarStyle: 'dark' }}
+      />
+      <Stack.Screen
+        name="AddEditSavings"
+        component={AddEditSavingsScreen}
+        options={modalOptions('New Savings Goal')}
+      />
+
+      {/* Bills screens */}
+      <Stack.Screen
+        name="Bills"
+        component={BillsScreen}
+        options={{ headerShown: false, statusBarColor: colors.background, statusBarStyle: 'dark' }}
+      />
+      <Stack.Screen
+        name="AddEditBill"
+        component={AddEditBillScreen}
+        options={modalOptions('New Bill')}
+      />
+
+      {/* Notifications screen */}
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ headerShown: false, statusBarColor: colors.background, statusBarStyle: 'dark' }}
+      />
+
+      {/* Split screens */}
+      <Stack.Screen
+        name="Splits"
+        component={SplitsScreen}
+        options={{ headerShown: false, statusBarColor: colors.background, statusBarStyle: 'dark' }}
+      />
+      <Stack.Screen
+        name="AddEditSplit"
+        component={AddEditSplitScreen}
+        options={modalOptions('New Split')}
+      />
+
+      {/* Categories (now accessed from More) */}
+      <Stack.Screen
+        name="Categories"
+        component={CategoriesScreen}
+        options={{ headerShown: false, statusBarColor: colors.background, statusBarStyle: 'dark' }}
+      />
+
+      {/* Profile (still accessible via notification header button) */}
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ headerShown: false, statusBarColor: colors.background, statusBarStyle: 'dark' }}
       />
     </Stack.Navigator>
   );

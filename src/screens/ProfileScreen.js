@@ -10,6 +10,7 @@ import { useApp } from '../context/AppContext';
 import { useSettings, CURRENCIES } from '../context/SettingsContext';
 import { spacing, radius, shadows } from '../theme';
 import client from '../api/client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -30,6 +31,7 @@ export default function ProfileScreen() {
   const [deleteTransactions, setDeleteTransactions] = useState(false);
   const [deleteCategories, setDeleteCategories] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [csvLoading, setCsvLoading] = useState(null);
 
   const handleChangePassword = async () => {
     if (!currentPw || !newPw || !confirmPw) return Alert.alert('Error', 'Fill in all fields.');
@@ -164,6 +166,26 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleExportCsv = async (endpoint, filename) => {
+    setCsvLoading(endpoint);
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+      const res = await fetch(`${baseUrl}${endpoint}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Export failed. Please try again.');
+      const csv = await res.text();
+      const path = FileSystem.documentDirectory + filename;
+      await FileSystem.writeAsStringAsync(path, csv, { encoding: 'utf8' });
+      await Sharing.shareAsync(path, { mimeType: 'text/csv', dialogTitle: `Save ${filename}` });
+    } catch (err) {
+      Alert.alert('Export Failed', err.message);
+    } finally {
+      setCsvLoading(null);
+    }
+  };
+
   const doDelete = async () => {
     const didDeleteTransactions = deleteTransactions;
     const didDeleteCategories = deleteCategories;
@@ -228,6 +250,15 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={[styles.profileHeader, { backgroundColor: colors.primary }]}>
+          {navigation.canGoBack() && (
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.backBtn}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.85)" />
+            </TouchableOpacity>
+          )}
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{user?.username?.[0]?.toUpperCase() || 'U'}</Text>
           </View>
@@ -276,6 +307,29 @@ export default function ProfileScreen() {
             iconColor="#6C5CE7"
             onPress={handlePickRestore}
           />
+        </View>
+
+        {/* CSV Export */}
+        <Text style={[styles.sectionLabel, { color: colors.textLight }]}>Export CSV</Text>
+        <View style={styles.group}>
+          {[
+            { label: 'Export Expenses CSV', icon: 'document-text-outline', endpoint: '/export/expenses', filename: 'expenses.csv', color: '#00B894' },
+            { label: 'Export Loans CSV', icon: 'people-outline', endpoint: '/export/loans', filename: 'loans.csv', color: '#6C5CE7' },
+            { label: 'Export Savings CSV', icon: 'trending-up-outline', endpoint: '/export/savings', filename: 'savings.csv', color: '#FDCB6E' },
+          ].map((item, idx, arr) => (
+            <React.Fragment key={item.endpoint}>
+              <Row
+                icon={item.icon}
+                label={item.label}
+                iconColor={item.color}
+                onPress={() => handleExportCsv(item.endpoint, item.filename)}
+                rightElement={csvLoading === item.endpoint
+                  ? <ActivityIndicator size="small" color={colors.primary} />
+                  : <Ionicons name="download-outline" size={16} color={colors.textMuted} />}
+              />
+              {idx < arr.length - 1 && <View style={[styles.separator, { backgroundColor: colors.border }]} />}
+            </React.Fragment>
+          ))}
         </View>
 
         {/* Danger Zone */}
@@ -513,6 +567,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   profileHeader: { alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.md },
+  backBtn: { position: 'absolute', top: spacing.md, left: spacing.md, padding: 4, zIndex: 1 },
   avatar: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', marginBottom: spacing.md },
   avatarText: { fontSize: 32, fontWeight: '800', color: '#fff' },
   username: { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 4 },

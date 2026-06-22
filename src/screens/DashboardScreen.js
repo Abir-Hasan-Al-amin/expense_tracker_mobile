@@ -11,6 +11,8 @@ import { formatCurrency } from '../utils/format';
 import ExpenseItem from '../components/ExpenseItem';
 import EmptyState from '../components/EmptyState';
 import * as budgetApi from '../api/budgets';
+import * as notificationsApi from '../api/notifications';
+import * as walletsApi from '../api/wallets';
 import client from '../api/client';
 
 // Process recurring at most once per user per calendar day
@@ -28,6 +30,8 @@ export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
   const { colors, currency } = useSettings();
   const [budgets, setBudgets] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [walletTotal, setWalletTotal] = useState(null);
 
   const loadData = useCallback(() => {
     const now = new Date();
@@ -43,6 +47,8 @@ export default function DashboardScreen({ navigation }) {
     }
     fetchStats({ month: now.getMonth() + 1, year: now.getFullYear() });
     budgetApi.getBudgets({ month: now.getMonth() + 1, year: now.getFullYear() }).then(setBudgets).catch(() => {});
+    notificationsApi.getNotifications({ limit: 1 }).then((d) => setUnreadCount(d?.unreadCount || 0)).catch(() => {});
+    walletsApi.getWallets().then((d) => setWalletTotal(d?.totalBalance ?? null)).catch(() => {});
   }, [fetchExpenses, fetchStats, markDirty, user?.username]);
 
   useEffect(() => {
@@ -62,14 +68,34 @@ export default function DashboardScreen({ navigation }) {
               <Text style={styles.greeting}>{getGreeting()}, {user?.username} 👋</Text>
               <Text style={styles.month}>{currentMonth}</Text>
             </View>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Profile')}>
-              <Ionicons name="settings-outline" size={22} color="#fff" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Notifications')}>
+                <Ionicons name="notifications-outline" size={22} color="#fff" />
+                {unreadCount > 0 && (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingsBtn} onPress={() => navigation.navigate('Profile')}>
+                <Ionicons name="settings-outline" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={[styles.balanceCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.balanceLabel, { color: colors.textLight }]}>Total Balance</Text>
-            <Text style={[styles.balanceAmount, { color: colors.text }]}>{formatCurrency(stats?.balance || 0, currency)}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <View>
+                <Text style={[styles.balanceLabel, { color: colors.textLight }]}>Monthly Balance</Text>
+                <Text style={[styles.balanceAmount, { color: colors.text }]}>{formatCurrency(stats?.balance || 0, currency)}</Text>
+              </View>
+              {walletTotal !== null && (
+                <TouchableOpacity onPress={() => navigation.navigate('Wallets')} style={[styles.walletChip, { backgroundColor: colors.primary + '15' }]}>
+                  <Ionicons name="wallet-outline" size={13} color={colors.primary} />
+                  <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>{formatCurrency(walletTotal, currency)}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={styles.summaryRow}>
               <View style={styles.summaryItem}>
                 <View style={[styles.summaryIcon, { backgroundColor: 'rgba(0,184,148,0.15)' }]}>
@@ -158,7 +184,10 @@ const styles = StyleSheet.create({
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md, marginBottom: spacing.lg },
   greeting: { fontSize: 20, fontWeight: '700', color: '#fff' },
   month: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  settingsBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  settingsBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', position: 'relative' },
+  notifBadge: { position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: '#FF6B6B', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 2 },
+  notifBadgeText: { fontSize: 9, fontWeight: '700', color: '#fff' },
+  walletChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20 },
   balanceCard: { borderRadius: radius.xl, padding: spacing.lg, marginTop: spacing.sm, ...shadows.medium },
   balanceLabel: { fontSize: 13, marginBottom: 4 },
   balanceAmount: { fontSize: 34, fontWeight: '800', marginBottom: spacing.md },
